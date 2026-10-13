@@ -1,0 +1,8 @@
+.development/
+*.gscbin
+*.log
+*.zip
+node_modules/
+iw7-mod/logs/
+iw7-mod/players2/
+install-manifest.json
