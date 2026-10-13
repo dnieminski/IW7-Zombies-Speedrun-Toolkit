@@ -1,4 +1,4 @@
-// Beast Runner 0.1.0. Observe only: no quest replacements or gameplay changes.
+// Beast Runner 0.1.3. Observe only: no quest replacements or gameplay changes.
 init()
 {
     if (getdvar("mapname") != "cp_final")
@@ -21,12 +21,17 @@ init()
     setdvar("br_log_path", getdvar("g_log"));
     setdvar("br_enabled", 1);
     setdvar("br_finish_valid", 0);
+    setdvar("br_hud_toggle", 0);
     for (i = 0; i < level.br_flags.size + 1; i++)
         setdvar("br_split_" + i, -1);
     publish();
 
     foreach (i, flag in level.br_flags)
-        level thread watch_flag(i, flag);
+    {
+        // Preserve the remaining dvar IDs, but omit the duplicate power split.
+        if (flag != "power_on")
+            level thread watch_flag(i, flag);
+    }
     level thread watch_boss_finish();
     level thread watch_game_end();
     level thread watch_shutdown();
@@ -165,6 +170,14 @@ update_snapshot()
     next_stats = 0;
     for (;;)
     {
+        if (getdvarint("br_hud_toggle"))
+        {
+            if (getdvar("br_hud") == "0")
+                setdvar("br_hud", 1);
+            else
+                setdvar("br_hud", 0);
+            setdvar("br_hud_toggle", 0);
+        }
         if (level.br_state == "running")
             level.br_elapsed = max(0, gettime() - level.br_start);
         if (level.br_state == "running" && gettime() >= next_stats)
