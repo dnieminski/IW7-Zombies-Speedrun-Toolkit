@@ -4,7 +4,6 @@ M.splits = {
     -- Third field is the stable GSC dvar ID. Display order may change safely.
     {"neil_head_found", "N31L head collected", 2},
     {"neil_head_placed", "N31L head installed", 3},
-    {"power_on", "Power restored", 0},
     {"bridge_constructed", "Pack-a-Punch bridge", 1},
     {"security_doors_deactivated", "Energy doors disabled", 4},
     {"fuse_puzzle_completed", "Fuse puzzle complete", 5},
@@ -26,9 +25,9 @@ function M.fields(s)
 end
 
 function M.time(ms)
-    if not ms or ms < 0 then return "--:--.---" end
+    if not ms or ms < 0 then return "--:--.-" end
     ms = math.floor(ms)
-    return string.format("%02d:%02d.%03d", math.floor(ms / 60000), math.floor(ms / 1000) % 60, ms % 1000)
+    return string.format("%02d:%02d.%d", math.floor(ms / 60000), math.floor(ms / 1000) % 60, math.floor(ms / 100) % 10)
 end
 
 function M.delta(ms)

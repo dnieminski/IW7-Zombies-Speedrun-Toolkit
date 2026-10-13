@@ -55,12 +55,12 @@ local function makeHUD(hud)
     if hud.BeastRunner then return end
     local element = LUI.UIElement.new()
     element.id = "BeastRunnerHUD"
-    element:SetAnchorsAndPosition(0, 1, 0, 1, 30 * scale, 420 * scale, 115 * scale, 390 * scale)
+    element:SetAnchorsAndPosition(0, 1, 0, 1, 30 * scale, 420 * scale, 30 * scale, 305 * scale)
     hud:addElement(element)
     hud.BeastRunner = element
     panel(element, "Backdrop", 0, 0, 390, 275, 0.8)
     text(element, "Title", "BEAST / SPEEDRUN TOOLKIT", 14, 12, 365, 17, {r = 0.25, g = 0.9, b = 0.75})
-    local timer = text(element, "Timer", "00:00.000", 14, 39, 365, 40)
+    local timer = text(element, "Timer", "00:00.0", 14, 39, 365, 40)
     local status = text(element, "Status", "ARMED / GAME TIME", 14, 85, 365, 16)
     local stats = text(element, "Stats", "", 14, 112, 365, 16)
     local lines = {}
@@ -79,7 +79,8 @@ local function makeHUD(hud)
             cachedCategory = category
             cachedBest = Core.summary(readHistory(), category).best
         end
-        status:setText(string.upper(run.state) .. " / GAME TIME / " .. category, 0)
+        local shortCategory = tostring(run.players) .. "P / " .. (run.dc == 1 and "DC" or "STANDARD")
+        status:setText(string.upper(run.state) .. " / GAME TIME / " .. shortCategory, 0)
         stats:setText(string.format("ROUND %d    KILLS %d    DOWNS %d", run.round, run.kills, run.downs), 0)
         local completed = {}
         for _, row in ipairs(splitRows()) do if row.value then completed[#completed + 1] = row end end
@@ -258,13 +259,25 @@ MenuBuilder.BuildRegisteredType = function(name, options, ...)
 end
 
 if not Engine.InFrontend() and Engine.IsAliensMode() then
-    if LUI.CPHUD and LUI.CPHUD.init then
-        local original = LUI.CPHUD.init
-        LUI.CPHUD.init = function(self, controller)
-            original(self, controller)
-            makeHUD(self)
+    local function attachToActiveHUD(manager)
+        local map = Engine.GetDvarString("ui_mapname")
+        if not map or map == "" then map = Engine.GetDvarString("mapname") end
+        if map == "cp_final" and manager and manager.activeHud then
+            makeHUD(manager.activeHud)
+            print("[BeastRunner] Overlay attached to Beast's active HUD.")
         end
+    end
+    if LUI.HudManager and LUI.HudManager.CreateHud then
+        local original = LUI.HudManager.CreateHud
+        LUI.HudManager.CreateHud = function(self, ...)
+            local result = original(self, ...)
+            attachToActiveHUD(self)
+            return result
+        end
+        -- iw7-mod may load custom scripts after the stock HUD was constructed.
+        local root = Engine.GetLuiRoot and Engine.GetLuiRoot()
+        if root and root.hudManager then attachToActiveHUD(root.hudManager) end
     else
-        print("[BeastRunner] CPHUD unavailable; see console.log. Timer script can still record events.")
+        print("[BeastRunner] HUD manager unavailable; timer events still record.")
     end
 end
