@@ -6,7 +6,8 @@ local methods = {}
 function methods:addElement(child) self.children[#self.children + 1] = child end
 function methods:registerEventHandler(name, fn) self.handlers[name] = fn end
 function methods:setText(value) self.value = value end
-for _, name in ipairs({"SetFont", "SetFontSize", "SetAlignment", "SetAnchorsAndPosition", "SetRGBFromTable", "SetAlpha", "setImage", "SetBottom", "addElementBefore"}) do
+function methods:SetAlpha(value) self.alpha = value end
+for _, name in ipairs({"SetFont", "SetFontSize", "SetAlignment", "SetAnchorsAndPosition", "SetRGBFromTable", "setImage", "SetBottom", "addElementBefore"}) do
     methods[name] = function() end
 end
 local function new()
@@ -22,7 +23,8 @@ Engine = {GetDvarString = function(k) return values[k] or "" end,
     SetDvarString = function(k, v) values[k] = v end,
     InFrontend = function() return frontend end, IsAliensMode = function() return true end}
 LUI = {UIText = {new = new}, UIImage = {new = new}, UIElement = {new = new}, UIBindButton = {new = new},
-    UITimer = {new = new}, Alignment = {Left = 0}, CPHUD = {init = function() end},
+    UITimer = {new = new}, Alignment = {Left = 0},
+    HudManager = {CreateHud = function(manager) manager.activeHud = new() end},
     FlowManager = {RequestLeaveMenu = function() end}}
 MenuBuilder = {m_types = {CPPauseMenuButtons = new, HeadquartersCustomizationButtons = new}}
 function MenuBuilder.registerType(name, fn) MenuBuilder.m_types[name] = fn end
@@ -32,21 +34,44 @@ function MenuBuilder.BuildRegisteredType(name, args)
 end
 ACTIONS = {OpenMenu = function() end}
 io.fileexists = function() return false end
+local existingManager = {activeHud = new()}
+Engine.GetLuiRoot = function() return {hudManager = existingManager} end
 require("__init__")
-local hud = new()
-LUI.CPHUD.init(hud, 0)
+assert(existingManager.activeHud.BeastRunner)
+local manager = {}
+LUI.HudManager.CreateHud(manager)
+local hud = manager.activeHud
 assert(hud.BeastRunner)
 hud.BeastRunner.handlers.br_hud_tick()
+assert(hud.BeastRunner.alpha == 1)
+local hudById = {}
+for _, child in ipairs(hud.BeastRunner.children) do if child.id then hudById[child.id] = child end end
+assert(hudById.Status.value == "RUNNING / GAME TIME / 1P / STANDARD")
+values.br_snapshot = "running|145050|1|10|0|0|2|1|1"
+hud.BeastRunner.handlers.br_hud_tick()
+assert(hudById.Status.value == "RUNNING / GAME TIME / 1P / DC")
+assert(hudById.Timer.value == "02:25.0")
+values.br_hud = "0"
+hud.BeastRunner.handlers.br_hud_tick()
+assert(hud.BeastRunner.alpha == 0 and values.br_snapshot:find("running", 1, true))
+values.br_hud = "1"
+hud.BeastRunner.handlers.br_hud_tick()
+assert(hud.BeastRunner.alpha == 1)
+values.mapname = "cp_zmb"
+local otherManager = {}
+LUI.HudManager.CreateHud(otherManager)
+assert(not otherManager.activeHud.BeastRunner)
+values.mapname = "cp_final"
 local stats = MenuBuilder.m_types.BeastRunnerStats(nil, {controllerIndex = 0})
 stats.handlers.br_menu_tick()
 local byId = {}
 for _, child in ipairs(stats.children) do if child.id then byId[child.id] = child end end
 assert(byId.Left2.value == "N31L head collected")
-assert(byId.Current2.value == "02:10.700")
+assert(byId.Current2.value == "02:10.7")
 assert(byId.Left3.value == "N31L head installed")
-assert(byId.Current3.value == "02:25.000")
-assert(byId.Left4.value == "Power restored")
-assert(byId.Current4.value == "02:25.000")
+assert(byId.Current3.value == "02:25.0")
+assert(byId.Left4.value == "Pack-a-Punch bridge")
+assert(byId.Current4.value == "--:--.-")
 local bind
 for _, child in ipairs(stats.children) do if child.handlers.button_alt1 then bind = child end end
 assert(bind)
@@ -68,7 +93,7 @@ io.readfile = function() return "0:00 BR1|START|first_spawn|0|1|0|0|0|0|1|1|0\n"
 local savedMenu = MenuBuilder.m_types.BeastRunnerStats(nil, {controllerIndex = 0})
 local savedById = {}
 for _, child in ipairs(savedMenu.children) do if child.id then savedById[child.id] = child end end
-assert(savedById.Current2.value == "00:10.000")
+assert(savedById.Current2.value == "00:10.0")
 assert(savedById.Right3.value == "Kills: 99")
 assert(savedById.Header.value:find("INTERRUPTED", 1, true))
-print("PASS: HUD/menu construction, stable split IDs, fixed columns, history controls, pause/main-menu buttons, disk history after relaunch")
+print("PASS: existing/future Beast HUD attachment, other-map exclusion, hide/show without stopping timer, split IDs, fixed columns, menu controls, saved history")

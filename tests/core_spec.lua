@@ -1,9 +1,12 @@
 local Core = require("core")
-assert(Core.time(0) == "00:00.000")
-assert(Core.time(60999) == "01:00.999")
-assert(Core.time(3600001) == "60:00.001")
-assert(Core.time(-1) == "--:--.---")
-assert(Core.delta(-1) == "-00:00.001")
+assert(Core.time(0) == "00:00.0")
+assert(Core.time(60999) == "01:00.9")
+assert(Core.time(3600001) == "60:00.0")
+assert(Core.time(-1) == "--:--.-")
+assert(Core.time(59950) == "00:59.9")
+assert(Core.time(60000) == "01:00.0")
+assert(Core.delta(-150) == "-00:00.1")
+for _, split in ipairs(Core.splits) do assert(split[1] ~= "power_on") end
 local function record(kind, name, ms, players, dc, valid)
     return "  0:00 BR1|" .. kind .. "|" .. name .. "|" .. ms .. "|12|100|2|1|30|" .. (players or 1) .. "|" .. (dc or 0) .. "|" .. (valid or 0) .. "\n"
 end
