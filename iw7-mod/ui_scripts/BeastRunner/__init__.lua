@@ -37,19 +37,162 @@ local function current()
     return Core.snapshot(Engine.GetDvarString("br_snapshot"))
 end
 
+local preferences = {}
+local settingsMap = "cp_final"
+local function preference(map, def)
+    local key = Core.preferenceKey(map, def)
+    if not preferences[key] then preferences[key] = Core.decodePreference(Engine.GetDvarString(key), def) end
+    return preferences[key]
+end
+
+local function savePreference(map, def, enabled, label, controllerIndex)
+    local key = Core.preferenceKey(map, def)
+    local encoded = Core.encodePreference(enabled, label)
+    -- Both the key and value are generated: user text is hex, never console syntax.
+    local ok = pcall(function() Engine.ExecNow('seta ' .. key .. ' "' .. encoded .. '"', controllerIndex) end)
+    if not ok or Engine.GetDvarString(key) ~= encoded then return false end
+    preferences[key] = Core.decodePreference(encoded, def)
+    return true
+end
+
+local function button(parent, id, label, x, y, w, action, controllerIndex)
+    -- The stock Zombies MenuButton forces a 322px background on menu_create.
+    -- Own every visual here so artwork and the clickable area share the same bounds.
+    local element = LUI.UIButton.new()
+    element.id = id
+    element:SetAnchorsAndPosition(0, 1, 0, 1, x * scale, (x + w) * scale, y * scale, (y + 32) * scale)
+    panel(element, "Fill", 0, 0, w, 32, 0.95)
+    local edges = {}
+    for index, bounds in ipairs({{0, 0, w, 1}, {0, 31, w, 1}, {0, 0, 1, 32}, {w - 1, 0, 1, 32}}) do
+        local edge = LUI.UIImage.new()
+        edge.id = "Edge" .. index
+        edge:setImage(RegisterMaterial("white"))
+        edge:SetAnchorsAndPosition(0, 1, 0, 1, bounds[1] * scale, (bounds[1] + bounds[3]) * scale, bounds[2] * scale, (bounds[2] + bounds[4]) * scale)
+        element:addElement(edge)
+        edges[index] = edge
+    end
+    element.Text = text(element, "Text", label, 12, 4, w - 24, 18)
+    local function highlight(focused)
+        local color = focused and {r = 0.25, g = 0.9, b = 0.75} or {r = 0.35, g = 0.38, b = 0.42}
+        for _, edge in ipairs(edges) do edge:SetRGBFromTable(color, 0) end
+        element.Text:SetRGBFromTable(focused and {r = 0.25, g = 0.9, b = 0.75} or {r = 0.9, g = 0.9, b = 0.9}, 0)
+    end
+    element:registerEventHandler("button_over", function() highlight(true) end)
+    element:registerEventHandler("button_up", function() highlight(false) end)
+    element:registerEventHandler("button_action", action)
+    highlight(false)
+    parent:addElement(element)
+    return element
+end
+
 local function splitRows(savedSplits, map)
     local rows = {}
     for index, def in ipairs(Core.splitsFor(map)) do
+        local option = preference(map, def)
         local value
         if savedSplits then
             value = savedSplits[def[1]]
         else
             value = tonumber(Engine.GetDvarString("br_split_" .. def[3]))
         end
-        rows[index] = {name = def[1], label = def[2], order = index, value = value and value >= 0 and value or nil}
+        if option.enabled then
+            rows[#rows + 1] = {name = def[1], label = option.label, order = index, value = value and value >= 0 and value or nil}
+        end
     end
     return rows
 end
+
+MenuBuilder.registerType("BeastRunnerSplitSettings", function(menu, controller)
+    local self = LUI.UIElement.new()
+    self.id = "BeastRunnerSplitSettings"
+    local controllerIndex = controller and controller.controllerIndex or 0
+    local map = Core.profile(settingsMap) and settingsMap or "cp_final"
+    panel(self, "Backdrop", 70, 70, 1780, 920, 0.98)
+    text(self, "Title", "EDIT SPLITS", 100, 95, 1600, 36)
+    local subtitle = text(self, "Subtitle", "", 100, 145, 1600, 22)
+    text(self, "Explanation", "OFF hides a split from the overlay and comparisons. Timer, event recording and PB eligibility continue.", 100, 190, 1660, 20)
+    text(self, "NameHeader", "SHOW / CUSTOM NAME", 100, 235, 600, 20)
+    text(self, "DefaultHeader", "DEFAULT NAME", 980, 235, 790, 20)
+    local notice = text(self, "Notice", "Rename up to 28 characters. An empty name restores the default. Settings are saved with the game profile.", 100, 815, 1660, 19)
+    local rows = {}
+    local refresh
+    for index = 1, 15 do
+        local row = {def = nil}
+        local y = 270 + (index - 1) * 35
+        row.toggle = button(self, "Track" .. index, "", 100, y, 490, function()
+            local def = row.def
+            if not def then return end
+            local option = preference(map, def)
+            if not savePreference(map, def, not option.enabled, option.custom, controllerIndex) then notice:setText("Could not save settings. Check the console for errors.", 0) end
+            refresh()
+        end, controllerIndex)
+        row.rename = button(self, "Rename" .. index, "RENAME", 620, y, 150, function()
+            local def, editMap = row.def, map
+            if not def then return end
+            if not OSK or not OSK.OpenScreenKeyboard then notice:setText("Keyboard unavailable here. Rename from the Zombies main menu.", 0); return end
+            local option = preference(editMap, def)
+            OSK.OpenScreenKeyboard(controllerIndex, "Split name (empty = default)", option.label, Core.labelLimit, false, false, true, function(_, value)
+                if value == nil then return end -- Cancel must not erase a name.
+                local latest = preference(editMap, def)
+                if not savePreference(editMap, def, latest.enabled, value, controllerIndex) then notice:setText("Could not save settings. Check the console for errors.", 0) end
+                refresh()
+            end, CoD and CoD.KeyboardInputTypes and CoD.KeyboardInputTypes.Normal)
+        end, controllerIndex)
+        row.reset = button(self, "Default" .. index, "DEFAULT", 790, y, 150, function()
+            local def = row.def
+            if not def then return end
+            if not savePreference(map, def, preference(map, def).enabled, "", controllerIndex) then notice:setText("Could not save settings. Check the console for errors.", 0) end
+            refresh()
+        end, controllerIndex)
+        row.label = text(self, "DefaultName" .. index, "", 980, y + 3, 790, 20)
+        rows[index] = row
+    end
+    refresh = function()
+        subtitle:setText(string.upper(Core.profile(map).name), 0)
+        for index, row in ipairs(rows) do
+            row.def = Core.splitsFor(map)[index]
+            local def = row.def
+            for _, element in ipairs({row.toggle, row.rename, row.reset, row.label}) do element:SetAlpha(def and 1 or 0, 0) end
+            for _, element in ipairs({row.toggle, row.rename, row.reset}) do
+                if element.SetButtonDisabled then element:SetButtonDisabled(def == nil) end
+            end
+            if def then
+                local option = preference(map, def)
+                row.toggle.Text:setText((option.enabled and "[X] " or "[ ] ") .. option.label, 0)
+                row.label:setText(def[2], 0)
+            else
+                row.toggle.Text:setText("", 0); row.label:setText("", 0)
+            end
+        end
+    end
+    local function changeMap(direction)
+        if not Engine.InFrontend() then return end
+        local index = 1
+        for i, id in ipairs(Core.maps.order) do if id == map then index = i end end
+        map = Core.maps.order[(index - 1 + direction) % #Core.maps.order + 1]
+        settingsMap = map
+        refresh()
+    end
+    local previous = button(self, "PreviousMap", "PREVIOUS MAP", 100, 870, 310, function() changeMap(-1) end, controllerIndex)
+    local nextMap = button(self, "NextMap", "NEXT MAP", 435, 870, 310, function() changeMap(1) end, controllerIndex)
+    previous:SetAlpha(Engine.InFrontend() and 1 or 0, 0); nextMap:SetAlpha(Engine.InFrontend() and 1 or 0, 0)
+    button(self, "ResetMap", "RESTORE MAP DEFAULTS", 770, 870, 460, function()
+        local ok = true
+        for _, def in ipairs(Core.splitsFor(map)) do
+            if not savePreference(map, def, true, "", controllerIndex) then ok = false end
+        end
+        if not ok then notice:setText("Some settings could not be saved. Check the console.", 0) end
+        refresh()
+    end, controllerIndex)
+    button(self, "Done", "DONE", 1260, 870, 310, function() LUI.FlowManager.RequestLeaveMenu(self) end, controllerIndex)
+    local bind = LUI.UIBindButton.new()
+    self:addElement(bind)
+    bind:registerEventHandler("button_secondary", function() LUI.FlowManager.RequestLeaveMenu(self) end)
+    bind:registerEventHandler("button_shoulderl", function() changeMap(-1) end)
+    bind:registerEventHandler("button_shoulderr", function() changeMap(1) end)
+    refresh()
+    return self
+end)
 
 local function makeHUD(hud)
     if hud.BeastRunner then return end
@@ -194,8 +337,8 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
                 end
             end
             right[1]:setText("BEST CUMULATIVE SPLITS / THIS CATEGORY", 0)
-            for index, def in ipairs(profile.splits) do
-                right[index + 1]:setText(def[2] .. "  " .. Core.time(summary.bestSplits[def[1]]), 0)
+            for index, row in ipairs(splitRows({}, map)) do
+                right[index + 1]:setText(row.label .. "  " .. Core.time(summary.bestSplits[row.name]), 0)
             end
         end
     end
@@ -214,17 +357,16 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
         {"NextMap", "NEXT MAP", function() changeMap(1) end},
         {"ViewHistory", "SPLITS / HISTORY", switchPage},
         {"ToggleHUD", "SHOW / HIDE HUD", toggleHUD},
-        {"ReloadHistory", "REFRESH HISTORY", reloadHistory}
+        {"ReloadHistory", "REFRESH HISTORY", reloadHistory},
+        {"EditSplits", "EDIT SPLITS", function()
+            settingsMap = Engine.InFrontend() and selectedMap or current().map
+            ACTIONS.OpenMenu("BeastRunnerSplitSettings", true, controllerIndex)
+        end}
     }
     for index, control in ipairs(controls) do
-        local button = MenuBuilder.BuildRegisteredType("MenuButton", {controllerIndex = controllerIndex})
-        button.id = control[1]
-        button.Text:setText(control[2], 0)
-        local x = 100 + (index - 1) * 335
-        button:SetAnchorsAndPosition(0, 1, 0, 1, x * scale, (x + 310) * scale, 870 * scale, 902 * scale)
-        button:registerEventHandler("button_action", control[3])
-        if index <= 2 then button:SetAlpha(Engine.InFrontend() and 1 or 0, 0) end
-        self:addElement(button)
+        local x = 100 + (index - 1) * 280
+        local controlButton = button(self, control[1], control[2], x, 870, 265, control[3], controllerIndex)
+        if index <= 2 then controlButton:SetAlpha(Engine.InFrontend() and 1 or 0, 0) end
     end
     local bind = LUI.UIBindButton.new()
     self:addElement(bind)
@@ -244,10 +386,13 @@ local function wrapButtons(build, isPause)
         local self = build(menu, controller)
         if not Engine.IsAliensMode() or self.BeastRunnerButton then return self end
         local controllerIndex = controller and controller.controllerIndex or 0
-        local button = MenuBuilder.BuildRegisteredType("MenuButton", {controllerIndex = controllerIndex})
+        -- Barracks uses GenericButton (500px), including its native text/focus
+        -- colors. MenuButton has a narrower Zombies-specific skin.
+        local button = MenuBuilder.BuildRegisteredType(isPause and "MenuButton" or "GenericButton", {controllerIndex = controllerIndex})
         button.id = "BeastRunnerButton"
         button.Text:setText("SPEEDRUN STATS", 0)
-        button:SetAnchorsAndPosition(0, 1, 0, 1, 0, 340 * scale, 120 * scale, 150 * scale)
+        button.buttonDescription = "Review Zombies run history, splits and personal bests for all five maps."
+        button:SetAnchorsAndPosition(0, 1, 0, 1, 0, (isPause and 340 or 500) * scale, 120 * scale, 150 * scale)
         button:registerEventHandler("button_action", function(_, event)
             ACTIONS.OpenMenu("BeastRunnerStats", true, event.controller or controllerIndex)
         end)
