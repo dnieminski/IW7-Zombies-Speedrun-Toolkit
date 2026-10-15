@@ -1,6 +1,6 @@
 {
   "name": "iw7-zombies-speedrun-toolkit",
-  "version": "0.2.0",
+  "version": "0.3.2",
   "private": true,
   "scripts": {
     "generate": "node tools/generate-profiles.cjs",
