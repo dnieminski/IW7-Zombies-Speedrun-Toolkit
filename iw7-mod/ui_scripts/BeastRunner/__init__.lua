@@ -37,9 +37,9 @@ local function current()
     return Core.snapshot(Engine.GetDvarString("br_snapshot"))
 end
 
-local function splitRows(savedSplits)
+local function splitRows(savedSplits, map)
     local rows = {}
-    for index, def in ipairs(Core.splits) do
+    for index, def in ipairs(Core.splitsFor(map)) do
         local value
         if savedSplits then
             value = savedSplits[def[1]]
@@ -59,7 +59,7 @@ local function makeHUD(hud)
     hud:addElement(element)
     hud.BeastRunner = element
     panel(element, "Backdrop", 0, 0, 390, 275, 0.8)
-    text(element, "Title", "BEAST / SPEEDRUN TOOLKIT", 14, 12, 365, 17, {r = 0.25, g = 0.9, b = 0.75})
+    local title = text(element, "Title", "SPEEDRUN TOOLKIT", 14, 12, 365, 17, {r = 0.25, g = 0.9, b = 0.75})
     local timer = text(element, "Timer", "00:00.0", 14, 39, 365, 40)
     local status = text(element, "Status", "ARMED / GAME TIME", 14, 85, 365, 16)
     local stats = text(element, "Stats", "", 14, 112, 365, 16)
@@ -67,23 +67,30 @@ local function makeHUD(hud)
     for index = 1, 4 do lines[index] = text(element, "Split" .. index, "", 14, 144 + (index - 1) * 25, 365, 16) end
     local cachedCategory, cachedBest = nil, nil
     local function update()
+        local map = Engine.GetDvarString("mapname")
         local enabled = Engine.GetDvarString("br_enabled") == "1"
             and Engine.GetDvarString("br_hud") ~= "0"
-            and Engine.GetDvarString("mapname") == "cp_final"
+            and Core.profile(map) ~= nil
         element:SetAlpha(enabled and 1 or 0, 0)
         if not enabled then return end
         local run = current()
+        -- Prefer the map in the server snapshot over stale UI/lobby values.
+        map = run.map or map
+        local profile = Core.profile(map)
+        if not profile then element:SetAlpha(0, 0); return end
+        title:setText(profile.short .. " / SPEEDRUN TOOLKIT", 0)
         timer:setText(Core.time(run.elapsed), 0)
         local category = Core.category(run)
-        if cachedCategory ~= category then
-            cachedCategory = category
-            cachedBest = Core.summary(readHistory(), category).best
+        local comparisonKey = map .. ":" .. category
+        if cachedCategory ~= comparisonKey then
+            cachedCategory = comparisonKey
+            cachedBest = Core.summary(readHistory(), category, map).best
         end
         local shortCategory = tostring(run.players) .. "P / " .. (run.dc == 1 and "DC" or "STANDARD")
         status:setText(string.upper(run.state) .. " / GAME TIME / " .. shortCategory, 0)
         stats:setText(string.format("ROUND %d    KILLS %d    DOWNS %d", run.round, run.kills, run.downs), 0)
         local completed = {}
-        for _, row in ipairs(splitRows()) do if row.value then completed[#completed + 1] = row end end
+        for _, row in ipairs(splitRows(nil, map)) do if row.value then completed[#completed + 1] = row end end
         table.sort(completed, function(a, b)
             if a.value == b.value then return a.order < b.order end
             return a.value < b.value
@@ -110,7 +117,7 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
     local controllerIndex = controller and controller.controllerIndex or 0
     panel(self, "Backdrop", 70, 70, 1780, 920, 0.98)
     text(self, "Title", "IW7 ZOMBIES SPEEDRUN TOOLKIT", 100, 95, 1600, 36)
-    text(self, "Subtitle", "THE BEAST FROM BEYOND / FIRST SPAWN TO BEAST BOSS DEFEATED", 100, 145, 1600, 20)
+    local subtitle = text(self, "Subtitle", "", 100, 145, 1600, 20)
     local header = text(self, "Header", "", 100, 190, 1640, 22)
     local info = text(self, "Info", "", 100, 230, 1640, 20)
     local left, right, currentTimes, pbTimes, deltas = {}, {}, {}, {}, {}
@@ -122,16 +129,25 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
         deltas[index] = text(self, "Delta" .. index, "", 825, y, 245, 20)
         right[index] = text(self, "Right" .. index, "", 1160, 280 + (index - 1) * 34, 650, 20)
     end
-    text(self, "Help", "BACK: close    ALT1: splits/history    ALT2: show/hide HUD    ALT3: refresh history", 100, 925, 1600, 19)
+    text(self, "Help", "Use the buttons above. Shoulder buttons: change map in main menu. Back: close.", 100, 925, 1600, 19)
     local page = "splits"
     local runs, source = readHistory()
+    local selectedMap = (Engine.InFrontend() and runs[#runs] and runs[#runs].map) or current().map or "cp_final"
     local function refresh()
         local frontend = Engine.InFrontend()
-        local saved = frontend and runs[#runs] or nil
+        local saved
+        if frontend then
+            for index = #runs, 1, -1 do
+                if runs[index].map == selectedMap then saved = runs[index]; break end
+            end
+        end
         local live = frontend and (saved or Core.snapshot("")) or current()
+        local map = frontend and selectedMap or live.map
+        local profile = Core.profile(map) or Core.profile("cp_final")
+        subtitle:setText(string.upper(profile.name .. " / FIRST SPAWN TO " .. profile.finishLabel), 0)
         local state = frontend and (saved and saved.status or "no recorded runs") or live.state
         local category = Core.category(live)
-        local summary = Core.summary(runs, category)
+        local summary = Core.summary(runs, category, map)
         local label = frontend and (saved and "LAST RUN #" .. saved.attempt .. " / " or "") or ""
         header:setText(label .. category .. "  /  " .. string.upper(state) .. "  /  " .. Core.time(live.elapsed), 0)
         info:setText(string.format("%d %s    %d valid %s    PB %s    Average %s", summary.attempts, summary.attempts == 1 and "attempt" or "attempts", summary.finishes, summary.finishes == 1 and "finish" or "finishes", Core.time(summary.best and summary.best.elapsed), Core.time(summary.average)), 0)
@@ -145,7 +161,7 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
             pbTimes[1]:setText("PB CUMULATIVE", 0)
             deltas[1]:setText("DELTA", 0)
             local savedSplits = frontend and (saved and saved.splits or {}) or nil
-            for index, row in ipairs(splitRows(savedSplits)) do
+            for index, row in ipairs(splitRows(savedSplits, map)) do
                 local best = summary.best and summary.best.splits[row.name]
                 local delta = row.value and best and Core.delta(row.value - best) or ""
                 left[index + 1]:setText(row.label, 0)
@@ -166,27 +182,57 @@ MenuBuilder.registerType("BeastRunnerStats", function(menu, controller)
             right[13]:setText("Game time / pauses excluded", 0)
             right[14]:setText("Practice build / boss finish unverified", 0)
         else
-            left[1]:setText("RECENT ATTEMPTS / ALL CATEGORIES", 0)
+            left[1]:setText("RECENT ATTEMPTS / THIS MAP / ALL CATEGORIES", 0)
             local line = 2
-            for index = #runs, math.max(1, #runs - 13), -1 do
+            for index = #runs, 1, -1 do
                 local run = runs[index]
-                local state = run.status
-                if state == "finished" and not run.valid then state = "finish / incomplete quest" end
-                left[line]:setText("#" .. run.attempt .. "  " .. Core.category(run) .. "  " .. Core.time(run.elapsed) .. "  " .. state .. "  K:" .. run.kills .. " D:" .. run.downs, 0)
-                line = line + 1
+                if run.map == map and line <= 15 then
+                    local state = run.status
+                    if state == "finished" and not run.valid then state = "finish / incomplete quest" end
+                    left[line]:setText("#" .. run.attempt .. "  " .. Core.category(run) .. "  " .. Core.time(run.elapsed) .. "  " .. state .. "  K:" .. run.kills .. " D:" .. run.downs, 0)
+                    line = line + 1
+                end
             end
             right[1]:setText("BEST CUMULATIVE SPLITS / THIS CATEGORY", 0)
-            for index, def in ipairs(Core.splits) do
+            for index, def in ipairs(profile.splits) do
                 right[index + 1]:setText(def[2] .. "  " .. Core.time(summary.bestSplits[def[1]]), 0)
             end
         end
     end
+    local function changeMap(direction)
+        if not Engine.InFrontend() then return end
+        local index = 1
+        for i, map in ipairs(Core.maps.order) do if map == selectedMap then index = i end end
+        selectedMap = Core.maps.order[(index - 1 + direction) % #Core.maps.order + 1]
+        refresh()
+    end
+    local function switchPage() page = page == "splits" and "history" or "splits"; refresh() end
+    local function toggleHUD() Engine.SetDvarString("br_hud", Engine.GetDvarString("br_hud") == "0" and "1" or "0") end
+    local function reloadHistory() runs, source = readHistory(); refresh() end
+    local controls = {
+        {"PreviousMap", "PREVIOUS MAP", function() changeMap(-1) end},
+        {"NextMap", "NEXT MAP", function() changeMap(1) end},
+        {"ViewHistory", "SPLITS / HISTORY", switchPage},
+        {"ToggleHUD", "SHOW / HIDE HUD", toggleHUD},
+        {"ReloadHistory", "REFRESH HISTORY", reloadHistory}
+    }
+    for index, control in ipairs(controls) do
+        local button = MenuBuilder.BuildRegisteredType("MenuButton", {controllerIndex = controllerIndex})
+        button.id = control[1]
+        button.Text:setText(control[2], 0)
+        local x = 100 + (index - 1) * 335
+        button:SetAnchorsAndPosition(0, 1, 0, 1, x * scale, (x + 310) * scale, 870 * scale, 902 * scale)
+        button:registerEventHandler("button_action", control[3])
+        if index <= 2 then button:SetAlpha(Engine.InFrontend() and 1 or 0, 0) end
+        self:addElement(button)
+    end
     local bind = LUI.UIBindButton.new()
     self:addElement(bind)
     bind:registerEventHandler("button_secondary", function() LUI.FlowManager.RequestLeaveMenu(self) end)
-    bind:registerEventHandler("button_alt1", function() page = page == "splits" and "history" or "splits"; refresh() end)
-    bind:registerEventHandler("button_alt2", function() Engine.SetDvarString("br_hud", Engine.GetDvarString("br_hud") == "0" and "1" or "0") end)
-    bind:registerEventHandler("button_alt3", function() runs, source = readHistory(); refresh() end)
+    bind:registerEventHandler("button_alt1", switchPage)
+    bind:registerEventHandler("button_alt2", toggleHUD)
+    bind:registerEventHandler("button_shoulderl", function() changeMap(-1) end)
+    bind:registerEventHandler("button_shoulderr", function() changeMap(1) end)
     self:registerEventHandler("br_menu_tick", refresh)
     self:addElement(LUI.UITimer.new(nil, {interval = 500, event = "br_menu_tick"}))
     refresh()
@@ -241,7 +287,7 @@ MenuBuilder.BuildRegisteredType = function(name, options, ...)
         local button = buildRegisteredType("MenuButton", {controllerIndex = controllerIndex})
         button.id = "BeastRunnerButton"
         button.Text:setText("SPEEDRUN STATS", 0)
-        button.buttonDescription = "Review Beast run history, splits and personal bests."
+        button.buttonDescription = "Review Zombies run history, splits and personal bests for all five maps."
         button:SetAnchorsAndPosition(0, 1, 0, 1, 0, 340 * scale, 350 * scale, 380 * scale)
         button:registerEventHandler("button_action", function(_, event)
             ACTIONS.OpenMenu("BeastRunnerStats", true, event.controller or controllerIndex)
@@ -262,9 +308,9 @@ if not Engine.InFrontend() and Engine.IsAliensMode() then
     local function attachToActiveHUD(manager)
         local map = Engine.GetDvarString("ui_mapname")
         if not map or map == "" then map = Engine.GetDvarString("mapname") end
-        if map == "cp_final" and manager and manager.activeHud then
+        if Core.profile(map) and manager and manager.activeHud then
             makeHUD(manager.activeHud)
-            print("[BeastRunner] Overlay attached to Beast's active HUD.")
+            print("[BeastRunner] Overlay attached for " .. map .. ".")
         end
     end
     if LUI.HudManager and LUI.HudManager.CreateHud then
