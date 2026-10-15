@@ -64,9 +64,13 @@ module.exports = [
     finish: {event: 'boss_fight_finished', kind: 'flag', id: 12, guard: 'none'},
     required: ['deathray_step7', 'chemistry_step4', 'launchcode_step4'],
     splits: [
-      s('deathray_step1', 'Zombie parts collected', 0),
-      s('deathray_step4', 'Zombie body assembled', 1),
-      s('deathray_step7', 'Garage key collected', 2),
+      // Retail garage interactions update fields, not the deathray quest flags.
+      // Keep legacy names/slots for saved history and custom labels.
+      s('deathray_step1', 'Zombie parts collected (6/6)', 0, 'town_state', 'mpq_zom_parts_picked_up'),
+      s('mirrors_collected', 'Mirrors collected (3/3)', 13, 'town_state', 'mirrors_picked_up'),
+      s('keycard_collected', 'Keycard collected', 14, 'town_state', 'punch_card_acquired'),
+      s('deathray_step4', 'Zombie body assembled', 1, 'town_state', 'body_made'),
+      s('deathray_step7', 'Garage key collected', 2, 'town_state', 'garage_key_found'),
       s('chemistry_step1', 'Chemistry table built', 3),
       s('chemistry_step3', 'Chemical compound ready', 4),
       s('chemistry_step4', 'Compound added to bomb', 5),
