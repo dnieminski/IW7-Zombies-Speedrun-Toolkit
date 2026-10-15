@@ -57,7 +57,7 @@ assert(hud.BeastRunner.alpha == 0 and values.br_snapshot:find("running", 1, true
 values.br_hud = "1"
 hud.BeastRunner.handlers.br_hud_tick()
 assert(hud.BeastRunner.alpha == 1)
-values.mapname = "cp_zmb"
+values.mapname = "cp_frontend"
 local otherManager = {}
 LUI.HudManager.CreateHud(otherManager)
 assert(not otherManager.activeHud.BeastRunner)
@@ -79,7 +79,7 @@ bind.handlers.button_alt1()
 assert(byId.Current2.value == "" and byId.PB2.value == "" and byId.Delta2.value == "")
 bind.handlers.button_alt2()
 assert(values.br_hud == "0")
-bind.handlers.button_alt3()
+byId.ReloadHistory.handlers.button_action()
 assert(MenuBuilder.m_types.CPPauseMenuButtons(nil, {controllerIndex = 0}).BeastRunnerButton)
 -- MainMenu assigns its builder after our script; construction must still wrap it.
 MenuBuilder.m_types.CPMainMenuButtons = new
@@ -96,4 +96,25 @@ for _, child in ipairs(savedMenu.children) do if child.id then savedById[child.i
 assert(savedById.Current2.value == "00:10.0")
 assert(savedById.Right3.value == "Kills: 99")
 assert(savedById.Header.value:find("INTERRUPTED", 1, true))
+-- Map selection in the frontend uses its own history and profile.
+savedById.NextMap.handlers.button_action()
+assert(savedById.Subtitle.value:find("ZOMBIES IN SPACELAND", 1, true))
+assert(savedById.Left2.value == "Pack-a-Punch visited")
+assert(savedById.Current2.value == "--:--.-")
+savedById.PreviousMap.handlers.button_action()
+assert(savedById.Current2.value == "00:10.0")
+frontend = false
+values.br_hud = "1"
+for _, map in ipairs(require("core").maps.order) do
+    values.mapname = map
+    values.br_snapshot = "running|1000|1|10|0|0|2|1|0|" .. map
+    local mapManager = {}
+    LUI.HudManager.CreateHud(mapManager)
+    assert(mapManager.activeHud.BeastRunner)
+    local title
+    for _, child in ipairs(mapManager.activeHud.BeastRunner.children) do if child.id == "Title" then title = child.value end end
+    assert(title == require("core").profile(map).short .. " / SPEEDRUN TOOLKIT")
+    local mapMenu = MenuBuilder.m_types.BeastRunnerStats(nil, {controllerIndex = 0})
+    mapMenu.handlers.br_menu_tick()
+end
 print("PASS: existing/future Beast HUD attachment, other-map exclusion, hide/show without stopping timer, split IDs, fixed columns, menu controls, saved history")
