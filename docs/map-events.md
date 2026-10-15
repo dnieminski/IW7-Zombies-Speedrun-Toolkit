@@ -1,4 +1,4 @@
-# Map event research — 0.2.0
+# Map event research — 0.3.3
 
 These definitions were traced through native quest scripts, not inferred from HUD text. They remain provisional until tested in the game. Source-name checks only establish that an event exists, not that it fires at the intended visible action.
 
@@ -11,7 +11,7 @@ Locally inspected [IW7 GSC dump](https://github.com/mjkzy/iw7-gsc-dump) at commi
 - Spaceland: cp/maps/cp_zmb/cp_zmb_dj.gsc defines the ufo quest, SETI-COM defenses, tone generators, and Alien progression. speaker_defense_completed is emitted once per player. The observer counts unique completions, suppressing notifications within one second of the previous completion; the three actual defenses are much farther apart. This avoids relying on a quest index which may advance before the observer resumes. cp_zmb_ufo.gsc sets ufo_destroyed after approximately three seconds of scripted UFO movement/destruction following the final shot. The timer stops at that flag, not at final shot damage.
 - Rave: cp/maps/cp_rave/cp_rave_j_mem_quest.gsc uses jmem quest indices 1, 4, and 7 for the three dismemberment rituals. The shared defense notification is accepted only at the corresponding index. photo_1_kev_given and photo_2_kev_given are set on repaired-photo pickup after the Slasher, despite their internal names. cp_rave_boat.gsc provides Pack-a-Punch and island flags. cp_rave_super_slasher_fight.gsc waits for super_slasher_death, emitted from mp/agents/superslasher/superslasher_agent.gsc; this precedes later victory/loot delays.
 - Shaolin: cp/maps/cp_disco/disco_mpq.gsc sets the locker, phone, poster, relic, and boss-entry flags. skq_p2t1_2 follows locker-key pickup, skq_p2t1_3 follows opening the locker, and correct_poster_got follows correct poster pickup. cp/maps/cp_disco/ratking_damage.gsc emits rat_king_killed. rat_king_fight.gsc uses zero-based rat_king_stage 6 for the final stage, so the observer requires at least 6. Earlier Rat King deaths do not finish a run. The later rk_fight_completed notification follows a long outro and is intentionally not used.
-- Attack: cp/maps/cp_town/cp_town_mpq.gsc, cp_town_chemistry.gsc, and cp_town_crafting.gsc provide the zombie, chemistry, and launch-code flags. cp_town_crab_boss_bomb.gsc branches between failed/retried final sequences and the successful death sequence. Only the successful branch sets boss_fight_finished, before the death animation/rewards. cp_town_crab_boss_fight.gsc provides boss_fight_active.
+- Attack: the first Director's Cut test recorded later chemistry/bomb flags but missed garage milestones. cp/maps/cp_town/cp_town_mpq.gsc's real pickup interactions set level.mpq_zom_parts_picked_up, level.mirrors_picked_up, level.punch_card_acquired, level.body_made, and level.garage_key_found, rather than the deathray_step1/4/7 flags previously observed. The recorder now samples these five persistent states every 50 ms, recording each once at first observation. Six distinct body keys (head, torso, left_arm, right_arm, left_leg, right_leg) and all three mirror keys (car_mirror, bathroom_mirror, elvira_mirror) are required for their collection splits; cp_town_elvira.gsc supplies the Elvira mirror pickup. Body assembly means successful life-ray activation, not merely placing six parts. The key split requires actual pickup, not key_spawned. Stable deathray split IDs/slots remain for compatibility; new mirrors/keycard splits use previously unused slots 13/14. Chemistry/bomb events remain native flags. cp_town_crab_boss_bomb.gsc sets boss_fight_finished only on successful final detonation, before death/rewards; cp_town_crab_boss_fight.gsc supplies boss_fight_active.
 - Beast: the existing rhino_fight_over finish requires level.dead_mammoths >= 2. Mephistopheles is excluded. Stable split slots are retained for old BR1 history; slot 0 (duplicate power restoration) remains unused. Disc puzzle retains the native fuse_puzzle_completed event name.
 - All maps: flag watchers reject notifications when the corresponding flag is false. Each split records once. Direct boss mode (level.direct_to_boss_fight) is excluded from full-quest PBs. Required observations below are consistency checks; Director's Cut may reveal legitimate skipped flags that need adjusting after testing.
 
@@ -81,9 +81,11 @@ Required full-quest observations: `brain_picked`, `eye_picked`, `heart_picked`, 
 
 | Split | Native event | Kind / condition | Slot |
 | --- | --- | --- | --- |
-| Zombie parts collected | deathray_step1 | flag | 0 |
-| Zombie body assembled | deathray_step4 | flag | 1 |
-| Garage key collected | deathray_step7 | flag | 2 |
+| Zombie parts collected (6/6) | level.mpq_zom_parts_picked_up | town_state; all six unique body keys true | 0 |
+| Mirrors collected (3/3) | level.mirrors_picked_up | town_state; all three mirror keys true | 13 |
+| Keycard collected | level.punch_card_acquired | town_state; true | 14 |
+| Zombie body assembled | level.body_made | town_state; true | 1 |
+| Garage key collected | level.garage_key_found | town_state; true | 2 |
 | Chemistry table built | chemistry_step1 | flag | 3 |
 | Chemical compound ready | chemistry_step3 | flag | 4 |
 | Compound added to bomb | chemistry_step4 | flag | 5 |
