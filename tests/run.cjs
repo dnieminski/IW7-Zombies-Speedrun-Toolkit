@@ -13,7 +13,7 @@ for (const name of ['core.lua', '__init__.lua', 'maps.lua']) {
   luaparse.parse(fs.readFileSync(path.join(luaRoot, name), 'utf8'), {luaVersion: '5.1'});
   console.log('PASS: Lua 5.1 syntax ' + name);
 }
-for (const name of ['core_spec.lua', 'maps_spec.lua', 'ui_spec.lua']) {
+for (const name of ['core_spec.lua', 'maps_spec.lua', 'preferences_spec.lua', 'ui_spec.lua']) {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
   const bootstrap = `package.path = ${JSON.stringify(luaRoot.replaceAll('\\', '/') + '/?.lua;')} .. package.path\n`;
