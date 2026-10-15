@@ -1,4 +1,4 @@
-// IW7 Zombies Speedrun Toolkit 0.2.0. Observe only: no quest replacements.
+// IW7 Zombies Speedrun Toolkit 0.3.3. Observe only: no quest replacements.
 init()
 {
     setdvar("br_enabled", 0);
@@ -32,7 +32,7 @@ init()
 
     foreach (i, name in level.br_names)
     {
-        if (name != "" && level.br_kinds[i] != "finish")
+        if (name != "" && level.br_kinds[i] != "finish" && level.br_kinds[i] != "town_state")
             level thread watch_split(i);
     }
     level thread watch_boss_finish();
@@ -123,6 +123,51 @@ watch_split(index)
 flag_is_set(name)
 {
     return isdefined(level.flag) && isdefined(level.flag[name]) && level.flag[name];
+}
+
+array_has_all(parts, keys)
+{
+    if (!isdefined(parts))
+        return 0;
+    foreach (key in keys)
+    {
+        if (!isdefined(parts[key]) || !parts[key])
+            return 0;
+    }
+    return 1;
+}
+
+town_state_complete(name)
+{
+    switch (name)
+    {
+        case "mpq_zom_parts_picked_up":
+            return array_has_all(level.mpq_zom_parts_picked_up, ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]);
+        case "mirrors_picked_up":
+            return array_has_all(level.mirrors_picked_up, ["car_mirror", "bathroom_mirror", "elvira_mirror"]);
+        case "punch_card_acquired":
+            return isdefined(level.punch_card_acquired) && level.punch_card_acquired;
+        case "body_made":
+            return isdefined(level.body_made) && level.body_made;
+        case "garage_key_found":
+            return isdefined(level.garage_key_found) && level.garage_key_found;
+    }
+    return 0;
+}
+
+sample_town_splits()
+{
+    if (level.br_map != "cp_town" || (level.br_state != "armed" && level.br_state != "running"))
+        return;
+    stamp = gettime();
+    foreach (i, name in level.br_names)
+    {
+        if (level.br_kinds[i] == "town_state" && !isdefined(level.br_seen[i]) && town_state_complete(level.br_events[i]))
+        {
+            level.br_seen[i] = stamp;
+            record_split(i, name, stamp);
+        }
+    }
 }
 
 record_split(index, name, stamp)
@@ -219,6 +264,8 @@ update_snapshot()
         }
         if (level.br_state == "running")
             level.br_elapsed = max(0, gettime() - level.br_start);
+        // These garage fields have no native completion notify; sample once/tick.
+        sample_town_splits();
         if (level.br_state == "running" && gettime() >= next_stats)
         {
             collect_stats();
@@ -325,9 +372,9 @@ configure_map()
             level.br_finish_index = 13;
             return 1;
         case "cp_town":
-            level.br_names = ["deathray_step1", "deathray_step4", "deathray_step7", "chemistry_step1", "chemistry_step3", "chemistry_step4", "launchcode_step1", "launchcode_step2", "launchcode_step3", "teleporter_charged", "launchcode_step4", "boss_fight_active", "boss_defeated", "", ""];
-            level.br_events = ["deathray_step1", "deathray_step4", "deathray_step7", "chemistry_step1", "chemistry_step3", "chemistry_step4", "launchcode_step1", "launchcode_step2", "launchcode_step3", "teleporter_charged", "launchcode_step4", "boss_fight_active", "boss_defeated", "", ""];
-            level.br_kinds = ["flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "finish", "", ""];
+            level.br_names = ["deathray_step1", "deathray_step4", "deathray_step7", "chemistry_step1", "chemistry_step3", "chemistry_step4", "launchcode_step1", "launchcode_step2", "launchcode_step3", "teleporter_charged", "launchcode_step4", "boss_fight_active", "boss_defeated", "mirrors_collected", "keycard_collected"];
+            level.br_events = ["mpq_zom_parts_picked_up", "body_made", "garage_key_found", "chemistry_step1", "chemistry_step3", "chemistry_step4", "launchcode_step1", "launchcode_step2", "launchcode_step3", "teleporter_charged", "launchcode_step4", "boss_fight_active", "boss_defeated", "mirrors_picked_up", "punch_card_acquired"];
+            level.br_kinds = ["town_state", "town_state", "town_state", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "flag", "finish", "town_state", "town_state"];
             level.br_stages = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
             level.br_required = ["deathray_step7", "chemistry_step4", "launchcode_step4"];
             level.br_finish_event = "boss_fight_finished";
