@@ -1,1 +1,1 @@
-IW7 Zombies Speedrun Toolkit: timers, Easter egg autosplits, map-specific statistics, and customizable split names and visibility for all five Zombies maps. Practice build 0.3.2.
+IW7 Zombies Speedrun Toolkit: timers, Easter egg autosplits, map-specific statistics, and customizable split names and visibility for all five Zombies maps. Practice build 0.3.3.
