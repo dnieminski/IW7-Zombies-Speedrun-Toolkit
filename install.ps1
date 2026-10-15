@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $resolvedGame = (Resolve-Path -LiteralPath $GamePath).Path
 if (!(Test-Path -LiteralPath (Join-Path $resolvedGame 'iw7-mod.exe'))) { throw 'iw7-mod.exe is missing from the game directory.' }
 if (Get-Process -Name 'iw7-mod','iw7_ship' -ErrorAction SilentlyContinue) { throw 'Close Infinite Warfare before installing.' }
-$files = @('custom_scripts\cp\beast_runner.gsc', 'ui_scripts\BeastRunner\__init__.lua', 'ui_scripts\BeastRunner\core.lua')
+$files = @('custom_scripts\cp\beast_runner.gsc', 'ui_scripts\BeastRunner\__init__.lua', 'ui_scripts\BeastRunner\core.lua', 'ui_scripts\BeastRunner\maps.lua')
 $modRoot = Join-Path $resolvedGame 'iw7-mod'
 $changedFiles = @()
 foreach ($relative in $files) {
@@ -32,5 +32,5 @@ foreach ($relative in $files) {
     Copy-Item -LiteralPath $source -Destination $target -Force
     if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $target).Hash) { throw "Installation verification failed: $target" }
 }
-Write-Output 'Installed and verified 3 script files. Launch iw7-mod.exe, then start The Beast from Beyond.'
+Write-Output 'Installed and verified 4 script files. Launch iw7-mod.exe, then start any of the five Zombies maps.'
 Write-Output 'Open the pause menu > SPEEDRUN STATS. Console fallback: luiOpenMenu BeastRunnerStats'

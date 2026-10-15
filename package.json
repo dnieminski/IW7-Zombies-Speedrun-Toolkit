@@ -1,0 +1,10 @@
+{
+  "name": "iw7-zombies-speedrun-toolkit",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "generate": "node tools/generate-profiles.cjs",
+    "test": "node tools/generate-profiles.cjs --check && node tests/profiles_spec.cjs && node tests/run.cjs"
+  },
+  "devDependencies": {"fengari": "0.1.5", "luaparse": "0.3.1"}
+}

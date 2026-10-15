@@ -1,1 +1,1 @@
-IW7 Zombies Speedrun Toolkit: an in-game timer, Easter egg autosplits, and run statistics for The Beast from Beyond. Practice build 0.1.3.
+IW7 Zombies Speedrun Toolkit: an in-game timer, Easter egg autosplits, and separate run statistics for all five Zombies maps. Practice build 0.2.0.
