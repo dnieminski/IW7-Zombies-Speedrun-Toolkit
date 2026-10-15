@@ -13,6 +13,40 @@ function M.splitsFor(map)
     return profile and profile.splits or {}
 end
 
+-- Preferences contain text only; never execute a config string as Lua.
+M.labelLimit = 28
+function M.cleanLabel(value)
+    value = tostring(value or ""):gsub("[%z\1-\31\127]", " "):gsub("%^", "")
+    value = value:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    -- Count UTF-8 glyph sequences so a limit never cuts a multibyte name in half.
+    local out, count = {}, 0
+    for glyph in value:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        count = count + 1
+        if count > M.labelLimit then break end
+        out[#out + 1] = glyph
+    end
+    return table.concat(out):gsub("%s+$", "")
+end
+
+function M.preferenceKey(map, def)
+    return "br_pref_" .. map .. "_" .. def[3]
+end
+
+function M.encodePreference(enabled, label)
+    label = M.cleanLabel(label)
+    local encoded = label:gsub(".", function(byte) return string.format("%02x", byte:byte()) end)
+    return "v1:" .. (enabled and "1" or "0") .. ":" .. encoded
+end
+
+function M.decodePreference(raw, def)
+    local enabled, hex = tostring(raw or ""):match("^v1:([01]):([0-9a-f]*)$")
+    if not enabled or #hex % 2 ~= 0 or #hex > M.labelLimit * 8 then
+        return {enabled = true, label = def[2], custom = ""}
+    end
+    local label = M.cleanLabel((hex:gsub("..", function(byte) return string.char(tonumber(byte, 16)) end)))
+    return {enabled = enabled == "1", label = label ~= "" and label or def[2], custom = label}
+end
+
 function M.fields(s)
     local out = {}
     for v in (s .. "|"):gmatch("(.-)|") do out[#out + 1] = v end
