@@ -2,7 +2,7 @@
 
 An in-game timer, Easter egg autosplitter, and statistics menu for all five Infinite Warfare Zombies maps on [iw7-mod](https://github.com/auroramod/iw7-mod).
 
-**Version 0.2.0 — practice build.** Adds Zombies in Spaceland, Rave in the Redwoods, Shaolin Shuffle, and Attack of the Radioactive Thing alongside The Beast from Beyond. Includes 64 split points, automatic map selection during gameplay, and separate history/PBs for each map.
+**Version 0.3.2 — practice build.** Supports all five maps with 64 split points, automatic map selection, separate map history/PBs, and editable split names and visibility. Includes the menu overlap fixes and matches the Barracks shortcut to the neighboring buttons' native width and text/focus styling.
 
 The recorder compiles and the Lua history/UI checks pass. Early Beast splits and the gameplay overlay have been tested by the user. The four new routes, full boss finishes, and pause behavior still need in-game validation. This is not yet a verified leaderboard timing tool.
 
@@ -45,7 +45,21 @@ Each split records its first completion. Optional splits may be missing and rout
 
 The overlay stays in the upper-left corner with equal horizontal/vertical margins. `RUNNING / GAME TIME` means the attempt is recording on the simulation clock. `DC` means Director's Cut.
 
-The statistics menu has clickable controls for previous/next map, splits/history, HUD visibility, and refreshing history. In the main menu, browse saved data for each map; gameplay selects the current map automatically. Controller shoulder buttons also change maps in the main menu. Internal `ALT1` / `ALT2` actions remain supported; they are not literal Alt+1 / Alt+2 keyboard combinations.
+The statistics menu has clickable controls for previous/next map, splits/history, HUD visibility, refreshing history, and **EDIT SPLITS**. In the main menu, browse saved data for each map; gameplay selects the current map automatically. Controller shoulder buttons also change maps in the main menu. Internal `ALT1` / `ALT2` actions remain supported; they are not literal Alt+1 / Alt+2 keyboard combinations.
+
+### Custom split names and visibility
+
+Open **SPEEDRUN STATS > EDIT SPLITS** for the selected map:
+
+- Click `[X]` / `[ ]` beside a split to show/hide it in the gameplay overlay and split comparisons.
+- Select **RENAME** and enter a name up to 28 characters. Cancelling keeps the old name; an empty name restores the default. Control characters and caret formatting are removed.
+- Select **DEFAULT** to restore that split's name while keeping its on/off state.
+- Select **RESTORE MAP DEFAULTS** to restore all names and enable all splits for that map.
+- Browse other maps from the main menu using the map buttons; during gameplay, settings stay on the current map.
+
+Names and visibility are presentation preferences. The timer, original event recording, full-run PB requirements, and saved run IDs continue unchanged, including when a split is hidden. Renamed labels also appear on old runs; no history is rewritten.
+
+Preferences use saved `br_pref_<map>_<slot>` game settings via the console's `seta` command, separate from the run log. Back up your game profile/configuration as well as the log to preserve customization. The Lua UI's file API is read-only, so this does not create a separate settings file. Updates and uninstall leave saved preferences intact. Keyboard interaction and persistence across a full game exit still need in-game confirmation; automated checks cover the preference format and a fresh UI load.
 
 Optional gameplay HUD keybind, entered in the game console:
 
