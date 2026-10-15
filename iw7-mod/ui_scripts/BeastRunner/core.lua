@@ -1,22 +1,17 @@
 -- Pure timing / history logic. Shared by the game menu and validation harness.
 local M = {}
-M.splits = {
-    -- Third field is the stable GSC dvar ID. Display order may change safely.
-    {"neil_head_found", "N31L head collected", 2},
-    {"neil_head_placed", "N31L head installed", 3},
-    {"bridge_constructed", "Pack-a-Punch bridge", 1},
-    {"security_doors_deactivated", "Energy doors disabled", 4},
-    {"fuse_puzzle_completed", "Fuse puzzle complete", 5},
-    {"button_entered_poster", "Button in poster", 6},
-    {"toggle_puzzle_button_pressed", "Puzzle button pressed", 7},
-    {"completed_toggle_puzzle_once", "Toggle puzzle complete", 8},
-    {"neils_head_placed_in_pap", "N31L delivered to PaP", 9},
-    {"players_triggered_bossfight", "Boss entry activated", 10},
-    {"rhino_stage_1", "Opening Rhinos cleared", 11},
-    {"rhino_stage_4", "Laser survival complete", 12},
-    {"rhino_stage_5", "EMP defense complete", 13},
-    {"boss_defeated", "Beast boss defeated", 14}
-}
+M.maps = require("maps")
+-- Retain this alias for existing Beast integrations and old log tests.
+M.splits = M.maps.cp_final.splits
+
+function M.profile(map)
+    return M.maps[map or "cp_final"]
+end
+
+function M.splitsFor(map)
+    local profile = M.profile(map)
+    return profile and profile.splits or {}
+end
 
 function M.fields(s)
     local out = {}
@@ -41,7 +36,7 @@ function M.snapshot(s)
         round = tonumber(f[3]) or 0, kills = tonumber(f[4]) or 0,
         downs = tonumber(f[5]) or 0, revives = tonumber(f[6]) or 0,
         headshots = tonumber(f[7]) or 0, players = tonumber(f[8]) or 1,
-        dc = tonumber(f[9]) or 0}
+        dc = tonumber(f[9]) or 0, map = f[10] ~= "" and f[10] or "cp_final"}
 end
 
 function M.category(run)
@@ -54,17 +49,21 @@ function M.history(text)
         if line:find("ShutdownGame:", 1, true) and current and current.status == "running" then
             current.status = "interrupted"
         end
-        local payload = line:match("BR1|([^\r]+)")
+        local payload = line:match("BR2|([^\r]+)")
+        local version2 = payload ~= nil
+        if not payload then payload = line:match("BR1|([^\r]+)") end
         if payload then
             local f = M.fields(payload)
+            local map = "cp_final"
+            if version2 then map = table.remove(f, 1) end
             local kind, name, stamp = f[1], f[2], tonumber(f[3])
-            if #f == 11 and stamp and stamp >= 0 then
+            if M.profile(map) and #f == 11 and stamp and stamp >= 0 then
                 if kind == "START" then
                     if current and current.status == "running" then current.status = "interrupted" end
-                    current = {status = "running", elapsed = 0, splits = {}, order = {}, attempt = #runs + 1}
+                    current = {status = "running", elapsed = 0, splits = {}, order = {}, attempt = #runs + 1, map = map}
                     runs[#runs + 1] = current
                 end
-                if current and current.status == "running" then
+                if current and current.status == "running" and current.map == map then
                     current.elapsed = math.max(current.elapsed, stamp)
                     current.round = tonumber(f[4]) or 0
                     current.kills = tonumber(f[5]) or 0
@@ -92,12 +91,13 @@ function M.history(text)
     return runs
 end
 
-function M.summary(runs, category)
+function M.summary(runs, category, map)
+    map = map or "cp_final"
     local s = {attempts = 0, finishes = 0, kills = 0, downs = 0, revives = 0,
         best = nil, average = nil, bestSplits = {}, segments = {}}
     local total = 0
     for _, run in ipairs(runs) do
-        if not category or M.category(run) == category then
+        if (run.map or "cp_final") == map and (not category or M.category(run) == category) then
             s.attempts = s.attempts + 1
             s.kills = s.kills + (run.kills or 0)
             s.downs = s.downs + (run.downs or 0)
