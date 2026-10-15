@@ -45,7 +45,9 @@ return {
         {"boss_defeated", "Final Rat King defeated", 13},
     }},
     ["cp_town"] = {name = "Attack of the Radioactive Thing", short = "ATTACK", finishLabel = "Final bomb sequence won", splits = {
-        {"deathray_step1", "Zombie parts collected", 0},
+        {"deathray_step1", "Zombie parts collected (6/6)", 0},
+        {"mirrors_collected", "Mirrors collected (3/3)", 13},
+        {"keycard_collected", "Keycard collected", 14},
         {"deathray_step4", "Zombie body assembled", 1},
         {"deathray_step7", "Garage key collected", 2},
         {"chemistry_step1", "Chemistry table built", 3},
