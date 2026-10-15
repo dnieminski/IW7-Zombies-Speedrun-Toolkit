@@ -2,7 +2,7 @@
 
 An in-game timer, Easter egg autosplitter, and statistics menu for all five Infinite Warfare Zombies maps on [iw7-mod](https://github.com/auroramod/iw7-mod).
 
-**Version 0.3.2 — practice build.** Supports all five maps with 64 split points, automatic map selection, separate map history/PBs, and editable split names and visibility. Includes the menu overlap fixes and matches the Barracks shortcut to the neighboring buttons' native width and text/focus styling.
+**Version 0.3.3 — practice build.** Supports all five maps with 66 split points, automatic map selection, separate map history/PBs, and editable split names and visibility. Fixes Attack's garage milestones by observing actual collection/completion state instead of inactive deathray quest flags. Adds separate three-mirror and keycard splits; retains the menu layout and Barracks styling fixes.
 
 The recorder compiles and the Lua history/UI checks pass. Early Beast splits and the gameplay overlay have been tested by the user. The four new routes, full boss finishes, and pause behavior still need in-game validation. This is not yet a verified leaderboard timing tool.
 
@@ -37,7 +37,9 @@ Every map starts at the first `spawned_player` notification. Respawning does not
 
 These endpoints follow native script events. Compare them with your speedrun category's rules during testing, especially Spaceland's destruction delay.
 
-The clock uses integer `gettime()` timestamps from the game simulation: **IGT**, excluding time while simulation stops. The HUD samples every 50 ms; splits record on their events independently of HUD refresh. Observed timestamps land on 50 ms increments, so this build does not provide 1 ms timing resolution. Times display as `MM:SS.t`, truncated to tenths; logs and calculations retain raw integer milliseconds.
+The clock uses integer `gettime()` timestamps from the game simulation: **IGT**, excluding time while simulation stops. The HUD samples every 50 ms. Notification/flag splits record on their events independently of HUD refresh; Attack's five garage milestones instead check persistent quest state every 50 ms and record the first observed completion. Those state checks may therefore be up to one sample late. Observed timestamps land on 50 ms increments, so this build does not provide 1 ms timing resolution. Times display as `MM:SS.t`, truncated to tenths; logs and calculations retain raw integer milliseconds.
+
+Attack's garage splits distinguish all six unique zombie parts collected, all three mirrors collected, keycard collected, the successful life-ray assembly (`body_made`), and garage key pickup. Placing parts on the bed alone does not complete the body-assembly split, and spawning the garage key does not count as picking it up. Existing split IDs, custom names, and history remain compatible. Earlier missed timestamps cannot be recovered from logs that never recorded them. The 0.3.3 checks pass locally; the corrected route needs an in-game retest.
 
 Each split records its first completion. Optional splits may be missing and routes can complete steps in different orders. Full-run PB eligibility requires selected main quest events to have been observed; direct boss mode is excluded. This is a consistency check, not cheat detection. See [event definitions](docs/map-events.md) for profiles and qualifications.
 
