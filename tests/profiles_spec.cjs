@@ -11,7 +11,7 @@ for (const p of profiles) {
   const finish = p.splits.find(s => s.kind === 'finish');
   assert.equal(finish.id, p.finish.id);
   assert.equal(finish.name, 'boss_defeated');
-  for (const s of p.splits) assert(['flag','event','ufo_stage','jmem_stage','finish'].includes(s.kind));
+  for (const s of p.splits) assert(['flag','event','ufo_stage','jmem_stage','town_state','finish'].includes(s.kind));
 }
 assert.equal(profiles.find(p => p.id === 'cp_disco').finish.guard, 'ratking_final');
 assert.equal(profiles.find(p => p.id === 'cp_final').finish.guard, 'mammoths');
@@ -23,11 +23,12 @@ if (fs.existsSync(referenceRoot)) {
   for (const p of profiles) {
     for (const s of p.splits) {
       if (s.kind === 'finish') continue;
-      assert(source.includes('"' + s.event + '"'), 'Missing reference event: ' + p.id + ':' + s.event);
+      const evidence = s.kind === 'town_state' ? 'level.' + s.event : '"' + s.event + '"';
+      assert(source.includes(evidence), 'Missing reference event/state: ' + p.id + ':' + s.event);
       checked++;
     }
     assert(source.includes('"' + p.finish.event + '"'), 'Missing victory reference: ' + p.id);
   }
-  console.log('PASS: ' + checked + ' split event names and all 5 victory events exist in the local reference scripts');
+  console.log('PASS: ' + checked + ' split event/state names and all 5 victory events exist in the local reference scripts');
 }
 console.log('PASS: profile identities, unique IDs, finish slots, and final-boss guards');
